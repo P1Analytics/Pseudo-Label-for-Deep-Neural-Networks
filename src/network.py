@@ -28,7 +28,7 @@ class Network(object):
         return activations
 
     def feedforward(self, a):
-        layer = 0
+        # layer = 0
         for b, w in zip(self.biases, self.weights):
            a = sigmoid(np.dot(w, a) + b)
             # TODO have to deal with exp overflow error for changing active function to rectifier
@@ -46,21 +46,22 @@ class Network(object):
 
         # feedforward during training phase
         activation = x
-        activations = [activation]  # list to store all the activations, layer by layer,first layer the original input
+        activations = [x]  # list to store all the activations, layer by layer,first layer the original input
         zs = []  # list to store all the z vectors, layer by layer
-        # layer = -1
+        # layer = 0
         for b, w in zip(self.biases, self.weights):
+            # TODO drop out here
             # activation = np.multiply(activation, dropout(0.5, np.shape(activation)))
             z = np.dot(w, activation) + b
             zs.append(z)
             activation = sigmoid(z)
             # TODO use differnet active functions return all WRONG label ! WHY ??
             # todo also add drop out on the hidd
-            # layer += 1
             # if layer == 0 :
             #     activation = rectifier(z)
             # else:
             #     activation = sigmoid(z)
+            # layer += 1
             activations.append(activation)
 
         # backward phase
@@ -117,7 +118,7 @@ class Network(object):
                 activation = self.feedforward(x)
                 activations.append(activation)
                 Y.append(y)
-            shape = np.shape(Y)[:-1]  # since y shape is (size of mini_batch,10,1), 1 is useless-->cut off
+            shape = np.shape(Y)[:-1] # since y shape is (size of mini_batch,10,1), 1 is useless-->cut off
             Y = np.reshape(Y, shape)
             activations = np.reshape(activations, shape)
             lPrimeFunctionValue += self.crossEntropy(Y, activations)
@@ -181,8 +182,6 @@ class Network(object):
             self.lossFunction(mini_batches, validation_PL_data, j)
 
 
-
-
 def sigmoid(z):
     return 1.0 / (1.0 + np.exp(-z))
 
@@ -196,7 +195,6 @@ def rectifier(z):
 
 
 def dropout(probability, shape):
-    # create the 1 or 0 mask (same size as input pics X ) with probability
     return np.random.binomial(1, probability, shape)
 
 
