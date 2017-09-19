@@ -1,12 +1,9 @@
-# https://github.com/mnielsen//neural-networks-and-deep-learning/ all the credit to this guy
-# testing for overfit: plot training set and validation set error as a function of training set size.
-# If they show a stable gap at the right end of the plot, you're probably overfitting.
+
 import gzip
 import pickle
 import random
 import numpy as np
 from collections import Counter
-
 np.seterr(all='ignore')
 
 
@@ -32,20 +29,20 @@ class Network(object):
         nabla_b = [np.zeros(b.shape) for b in self.biases]
         nabla_w = [np.zeros(w.shape) for w in self.weights]
 
-        # feedforward during training phase
+        # feedforward phase
         activation = x
         activations = [x]
         zs = []
         layer = 0
         for b, w in zip(self.biases, self.weights):
-            # TODO drop out here(9) drop out making things worse not better
-            # drop out rates: 50 % dropout for all hidden units;  20 % dropout for visible units
-            activation = np.multiply(activation, dropout(0.2, np.shape(activation)))
+            # TODO drop out here(9) drop out making things worse not better  drop out rates: 50 % dropout for all hidden units;  20 % dropout for visible units
+            # activation = np.multiply(activation, dropout(0.2, np.shape(activation)))
             z = np.dot(w, activation) + b
             zs.append(z)
             if layer == 0:
-                # activation = rectifier(z)
                 activation = sigmoid(z)
+                # TODO use differnet active functions return all WRONG label ! WHY ??
+                # activation = rectifier(z)
             else:
                 activation = sigmoid(z)
             layer += 1
@@ -53,11 +50,10 @@ class Network(object):
 
         # backward phase
         # delta = self.cost_derivative(activations[-1], y) * sigmoid_prime(zs[-1]) # QuadraticCost
-        delta = self.cost_derivative(activations[-1], y)
+        delta = self.cost_derivative(activations[-1], y) # cross entropy
 
         if pl:
             delta *= self.alfaCoefficient(epoch)
-
         nabla_b[-1] = delta
         nabla_w[-1] = np.dot(delta, activations[-2].transpose())
 
@@ -76,20 +72,19 @@ class Network(object):
         for b, w in zip(self.biases, self.weights):
             z = np.dot(w, a) + b
             if layer == 0:
-                # a = rectifier(z) # for hidden layers
                 a = sigmoid(z)
+                # TODO different active function in the hidden layer
+                # a = rectifier(z) # for hidden layers
             else:
                 a = sigmoid(z)  # for output layer
             layer += 1
         return a
 
     def evaluate(self, test_data):
-        test_results = [(np.argmax(self.feedforward(x)), y)
-                        for (x, y) in test_data]
+        test_results = [(np.argmax(self.feedforward(x)), y) for (x, y) in test_data]
         return sum(int(x == y) for (x, y) in test_results)
 
     def cost_derivative(self, output_activations, y):
-        # cost_derivative https://github.com/mnielsen/neural-networks-and-deep-learning/blob/master/src/network2.py
         return output_activations - y
 
     def alfaCoefficient(self, currentEpoch, DAE=False):
@@ -106,23 +101,20 @@ class Network(object):
 
     def SGD_PL(self, training_data, epochs, mini_batch_size, eta, validation_data, test_data=None):
 
-        # want pseudo labels, training network with training data and calculate validation data pseudo labels
         validation_results = []
         for j in range(epochs):
-            # training session
             random.shuffle(training_data)
             mini_batches = [training_data[k:k + mini_batch_size] for k in range(0, len(training_data), mini_batch_size)]
             for mini_batch in mini_batches:
                 self.backprop_with_mini_batch(mini_batch, eta)
 
-            # pseudo label
+        # pseudo label
             labels = []
             for (x, y) in validation_data:
                 output = self.feedforward(x)
                 labels.append(np.argmax(output))
             validation_results.append(labels)
 
-        # set pseudo labels with the labels in the highest vote for epoch times
         validation_array_results = np.array(validation_results)
         pseudo_labels = []
         validation_results = []
@@ -133,18 +125,19 @@ class Network(object):
         X = [x for x, y in validation_data]
         validation_PL_Label = list(zip(X, pseudo_labels))
 
-        print("pseudo label")
         for j in range(epochs):
-            # training the network with validation data with pseudo labels
+            random.shuffle(training_data)
+            mini_batches = [training_data[k:k + mini_batch_size] for k in range(0, len(training_data), mini_batch_size)]
+            for mini_batch in mini_batches:
+                self.backprop_with_mini_batch(mini_batch, eta)
+
             random.shuffle(validation_PL_Label)
             mini_valid_batch_size = 256
             mini_valid_batches = [validation_PL_Label[k:k + mini_valid_batch_size] for k in
                                   range(0, len(validation_data), mini_valid_batch_size)]
-
             for mini_valid_batch in mini_valid_batches:
                 self.backprop_with_mini_batch(mini_valid_batch, eta, epoch=j, pl=True)
 
-            # evaluate with test data set
             if test_data:
                 print("Epoch {0}: {1} / {2}".format(j, self.evaluate(test_data), len(test_data)))
             else:
@@ -164,14 +157,10 @@ def rectifier(z):  # f(x)=max(0,x)
 
 
 def rectifier_prime(z):  # f'(x)=(max(0,x))'  http://kawahara.ca/what-is-the-derivative-of-relu/
-    print(type(z))
-    print(z)
     new_z = np.zeros(np.shape(z))
-    print(new_z)
     for i in range(np.shape(z)[0]):
         if z[i] > 0.:
             new_z[i] = 1
-    print(new_z)
     return new_z
 
 
@@ -186,28 +175,6 @@ def vectorized_result(j):
 
 
 def load_data():
-    """Return the MNIST data as a tuple containing the training data,
-    the validation data, and the test data.
-
-    The ``training_data`` is returned as a tuple with two entries.
-    The first entry contains the actual training images.  This is a
-    numpy ndarray with 50,000 entries.  Each entry is, in turn, a
-    numpy ndarray with 784 values, representing the 28 * 28 = 784
-    pixels in a single MNIST image.
-
-    The second entry in the ``training_data`` tuple is a numpy ndarray
-    containing 50,000 entries.  Those entries are just the digit
-    values (0...9) for the corresponding images contained in the first
-    entry of the tuple.
-
-    The ``validation_data`` and ``test_data`` are similar, except
-    each contains only 10,000 images.
-
-    This is a nice data format, but for use in neural networks it's
-    helpful to modify the format of the ``training_data`` a little.
-    That's done in the wrapper function ``load_data_wrapper()``, see
-    below.
-    """
     f = gzip.open('mnist.pkl.gz', 'rb')
     training_data, validation_data, test_data = pickle.load(f, encoding='latin1')
     f.close()
@@ -215,26 +182,6 @@ def load_data():
 
 
 def load_data_wrapper():
-    """Return a tuple containing ``(training_data, validation_data,
-    test_data)``. Based on ``load_data``, but the format is more
-    convenient for use in our implementation of neural networks.
-
-    In particular, ``training_data`` is a list containing 50,000
-    2-tuples ``(x, y)``.  ``x`` is a 784-dimensional numpy.ndarray
-    containing the input image.  ``y`` is a 10-dimensional
-    numpy.ndarray representing the unit vector corresponding to the
-    correct digit for ``x``.
-
-    ``validation_data`` and ``test_data`` are lists containing 10,000
-    2-tuples ``(x, y)``.  In each case, ``x`` is a 784-dimensional
-    numpy.ndarry containing the input image, and ``y`` is the
-    corresponding classification, i.e., the digit values (integers)
-    corresponding to ``x``.
-
-    Obviously, this means we're using slightly different formats for
-    the training data and the validation / test data.  These formats
-    turn out to be the most convenient for use in our neural network
-    code."""
     tr_d, va_d, te_d = load_data()
     training_inputs = [np.reshape(x, (784, 1)) for x in tr_d[0]]
     training_results = [vectorized_result(y) for y in tr_d[1]]

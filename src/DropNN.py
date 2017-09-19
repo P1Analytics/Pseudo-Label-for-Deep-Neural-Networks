@@ -1,6 +1,4 @@
-# https://github.com/mnielsen//neural-networks-and-deep-learning/ all the credit to this guy
-# testing for overfit: p lot training set and validation set error as a function of training set size.
-# If they show a stable gap at the right end of the plot, you're probably overfitting.
+
 import gzip
 import pickle
 import random
@@ -18,7 +16,6 @@ class Network(object):
     def backprop_with_mini_batch(self, mini_batch, eta=3, epoch=0, pseu=False):
         nabla_b = [np.zeros(b.shape) for b in self.biases]
         nabla_w = [np.zeros(w.shape) for w in self.weights]
-        # activations = []
         for x, y in mini_batch:
             delta_nabla_b, delta_nabla_w = self.backprop(x, y)
             nabla_b = [nb + dnb for nb, dnb in zip(nabla_b, delta_nabla_b)]
@@ -38,21 +35,21 @@ class Network(object):
         layer = 0
         for b, w in zip(self.biases, self.weights):
             # TODO drop out here(9) drop out making things worse not better  drop out rates: 50 % dropout for all hidden units;  20 % dropout for visible units
-            activation = np.multiply(activation, dropout(0.2, np.shape(activation)))
+            # activation = np.multiply(activation, dropout(0.2, np.shape(activation)))
             z = np.dot(w, activation) + b
             zs.append(z)
-            # TODO use differnet active functions return all WRONG label ! WHY ??
-            # todo also add drop out on the hidd
             if layer == 0:
-                # activation = rectifier(z)
                 activation = sigmoid(z)
+                # TODO use differnet active functions return all WRONG label ! WHY ??
+                # activation = rectifier(z)
             else:
                 activation = sigmoid(z)
             layer += 1
             activations.append(activation)
 
         # backward phase
-        delta = self.cost_derivative(activations[-1], y)
+        # delta = self.cost_derivative(activations[-1], y) * sigmoid_prime(zs[-1]) # QuadraticCost
+        delta = self.cost_derivative(activations[-1], y) # cross entropy
         nabla_b[-1] = delta
         nabla_w[-1] = np.dot(delta, activations[-2].transpose())
 
@@ -70,8 +67,9 @@ class Network(object):
         for b, w in zip(self.biases, self.weights):
             z = np.dot(w, a) + b
             if layer == 0:
-                # a = rectifier(z) # for hidden layers
                 a = sigmoid(z)
+                # TODO different active function in the hidden layer
+                # a = rectifier(z) # for hidden layers
             else:
                 a = sigmoid(z)  # for output layer
             layer += 1
@@ -157,6 +155,64 @@ def load_data_wrapper():
     test_inputs = [np.reshape(x, (784, 1)) for x in te_d[0]]
     test_data = list(zip(test_inputs, te_d[1]))
     return (training_data, validation_data, test_data)
+
+def split_by_label(dataset, num_per_label):
+    # pick out the same size label from data set
+    counter = np.zeros(10)  # for 10 classes
+    new_dataset = []
+    for i in dataset:
+        x, y = i
+        if type(y) == np.ndarray:
+            y = np.argmax(y)
+        if y == 0 and counter[0] < num_per_label:
+            new_dataset.append(i)
+            counter[0] += 1
+            continue
+        if y == 1 and counter[1] < num_per_label:
+            new_dataset.append(i)
+            counter[1] += 1
+            continue
+        if y == 2 and counter[2] < num_per_label:
+            new_dataset.append(i)
+            counter[2] += 1
+            continue
+        if y == 3 and counter[3] < num_per_label:
+            new_dataset.append(i)
+            counter[3] += 1
+            continue
+        if y == 4 and counter[4] < num_per_label:
+            new_dataset.append(i)
+            counter[4] += 1
+            continue
+        if y == 5 and counter[5] < num_per_label:
+            new_dataset.append(i)
+            counter[5] += 1
+            continue
+
+        if y == 6 and counter[6] < num_per_label:
+            new_dataset.append(i)
+            counter[6] += 1
+            continue
+
+        if y == 7 and counter[7] < num_per_label:
+            new_dataset.append(i)
+            counter[7] += 1
+            continue
+
+        if y == 8 and counter[8] < num_per_label:
+            new_dataset.append(i)
+            counter[8] += 1
+
+            continue
+
+        if y == 9 and counter[9] < num_per_label:
+            new_dataset.append(i)
+            counter[9] += 1
+            continue
+
+    random.shuffle(new_dataset)
+    print(counter)
+    return new_dataset
 
 
 if __name__ == "__main__":

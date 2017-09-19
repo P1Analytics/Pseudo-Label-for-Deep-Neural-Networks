@@ -1,12 +1,9 @@
-# https://github.com/mnielsen//neural-networks-and-deep-learning/ all the credit to this guy
-# testing for overfit: plot training set and validation set error as a function of training set size.
-# If they show a stable gap at the right end of the plot, you're probably overfitting.
+
 import gzip
 import pickle
 import random
 import numpy as np
 from collections import Counter
-
 np.seterr(all='ignore')
 
 
@@ -17,36 +14,35 @@ class Network(object):
         self.biases = [np.random.randn(y, 1) for y in sizes[1:]]
         self.weights = [np.random.randn(y, x) for x, y in zip(sizes[:-1], sizes[1:])]
 
-    def backprop_with_mini_batch(self, mini_batch, eta=3, epoch=0, pseu=False, DAE=False):
+    def backprop_with_mini_batch(self, mini_batch, eta=3, epoch=0, pl=False, DAE=False):
         nabla_b = [np.zeros(b.shape) for b in self.biases]
         nabla_w = [np.zeros(w.shape) for w in self.weights]
-
         for x, y in mini_batch:
-            delta_nabla_b, delta_nabla_w = self.backprop(x, y, epoch, pseu, DAE)
+            delta_nabla_b, delta_nabla_w = self.backprop(x, y, epoch, pl, DAE)
             nabla_b = [nb + dnb for nb, dnb in zip(nabla_b, delta_nabla_b)]
             nabla_w = [nw + dnw for nw, dnw in zip(nabla_w, delta_nabla_w)]
-
         self.weights = [w - (eta / len(mini_batch)) * nw for w, nw in zip(self.weights, nabla_w)]
         self.biases = [b - (eta / len(mini_batch)) * nb for b, nb in zip(self.biases, nabla_b)]
 
-    def backprop(self, x, y, epoch=0, pseu=False, DAE=False):
+    def backprop(self, x, y, epoch=0, pl=False, DAE=False):
 
         nabla_b = [np.zeros(b.shape) for b in self.biases]
         nabla_w = [np.zeros(w.shape) for w in self.weights]
 
-        # feedforward
+        # feedforward phase
         activation = x
         activations = [x]
         zs = []
         layer = 0
         for b, w in zip(self.biases, self.weights):
-            # drop out rates: 50 % dropout for all hidden units;  20 % dropout for visible units
-            activation = np.multiply(activation, dropout(0.2, np.shape(activation)))
+            # TODO drop out here(9) drop out making things worse not better  drop out rates: 50 % dropout for all hidden units;  20 % dropout for visible units
+            # activation = np.multiply(activation, dropout(0.2, np.shape(activation)))
             z = np.dot(w, activation) + b
             zs.append(z)
             if layer == 0:
-                # activation = rectifier(z)
                 activation = sigmoid(z)
+                # TODO use differnet active functions return all WRONG label ! WHY ??
+                # activation = rectifier(z)
             else:
                 activation = sigmoid(z)
             layer += 1
@@ -56,17 +52,20 @@ class Network(object):
         # backward phase
         if DAE:
             y = x
+
+        # delta = self.cost_derivative(activations[-1], y) * sigmoid_prime(zs[-1]) # QuadraticCost
         delta = self.cost_derivative(activations[-1], y)
 
-        if pseu:
-            delta *= self.alfaCoefficient(epoch, DAE) # TODO when will be both pseudo label and DAE they are in different phase
-
+        if pl:
+            # TODO when will be both pseudo label and DAE they are in different phase
+            delta *= self.alfaCoefficient(epoch, DAE)
         nabla_b[-1] = delta
         nabla_w[-1] = np.dot(delta, activations[-2].transpose())
 
         for l in range(2, self.num_layers):
             z = zs[-l]
             delta = np.dot(self.weights[-l + 1].transpose(), delta) * sigmoid_prime(z)
+            # TODO different active function in the hidden layer, different prime(3)(BP2 in Ref)
             # delta = np.dot(self.weights[-l + 1].transpose(), delta) * rectifier_prime(z)
             nabla_b[-l] = delta
             nabla_w[-l] = np.dot(delta, activations[-l - 1].transpose())
@@ -78,16 +77,16 @@ class Network(object):
         for b, w in zip(self.biases, self.weights):
             z = np.dot(w, a) + b
             if layer == 0:
-                # a = rectifier(z) # for hidden layers
                 a = sigmoid(z)
+                # TODO different active function in the hidden layer
+                # a = rectifier(z) # for hidden layers
             else:
                 a = sigmoid(z)  # for output layer
             layer += 1
         return a
 
     def evaluate(self, test_data):
-        test_results = [(np.argmax(self.feedforward(x)), y)
-                        for (x, y) in test_data]
+        test_results = [(np.argmax(self.feedforward(x)), y) for (x, y) in test_data]
         return sum(int(x == y) for (x, y) in test_results)
 
     def cost_derivative(self, output_activations, y):
@@ -106,53 +105,58 @@ class Network(object):
             return 3
 
     def SGD_DAE(self, training_data, epochs, mini_batch_size, eta, validation_data=None, test_data=None):
-        # DAE unsupervised learning
-        # Now we want pseudo labels, by using training data and validation data
+
+        print("# DAE unsupervised learning")
         validation_results = []
         for j in range(epochs):
-            # training session
             random.shuffle(training_data)
             mini_batches = [training_data[k:k + mini_batch_size] for k in range(0, len(training_data), mini_batch_size)]
-
             for mini_batch in mini_batches:
                 self.backprop_with_mini_batch(mini_batch, eta, DAE=True)
 
-        # Fine tuning supervised learning
-        secondNetwork = Network([784, 9, 10])
+
+        print("# Fine tuning supervised learning")
+        input_layer = self.sizes[0]
+        hidden_layer = self.sizes[1]
+        output_layer = 10
+        secondNetwork = Network([input_layer,hidden_layer, output_layer])
         secondNetwork.weights[0] = self.weights[0]
         secondNetwork.biases[0] = self.biases[0]
 
-        for mini_batch in mini_batches:
-            secondNetwork.backprop_with_mini_batch(mini_batch, eta)
+        for j in range(epochs):
+            random.shuffle(training_data)
+            mini_batches = [training_data[k:k + mini_batch_size] for k in range(0, len(training_data), mini_batch_size)]
+            for mini_batch in mini_batches:
+                secondNetwork.backprop_with_mini_batch(mini_batch, eta)
 
             # pseudo label session
-            test_results = []
+            labels = []
             for (x, y) in validation_data:
                 output = secondNetwork.feedforward(x)
-                test_results.append(np.argmax(output))
-            validation_results.append(test_results)
+                labels.append(np.argmax(output))
+            validation_results.append(labels)
 
         validation_array_results = np.array(validation_results)
         pseudo_labels = []
-        validation_results = []
         for i in range(validation_array_results.shape[1]):
             a = Counter(validation_array_results[:, i]).most_common(1)[0][0]
-            validation_results.append(a)
             label = vectorized_result(a)
             pseudo_labels.append(label)
-        validation_PL_data = list(zip([x for x, y in validation_data], pseudo_labels))
-        # print("the real one is ", [y for x, y in validation_data])
-        # Now we have pseudo labels in validation dataset
+            validation_PL_Label = list(zip([x for x, y in validation_data], pseudo_labels))
 
+        print("# train the network again with (training data+ real label) & (validate data + pseudo label)")
         for j in range(epochs):
-            random.shuffle(validation_PL_data)
-            np.shape(validation_data)
-            mini_valid_batch_size = 3
-            n = len(validation_data)
-            mini_valid_batches = [validation_PL_data[k:k + mini_valid_batch_size] for k in
-                                  range(0, n, mini_valid_batch_size)]
+            random.shuffle(training_data)
+            mini_batches = [training_data[k:k + mini_batch_size] for k in range(0, len(training_data), mini_batch_size)]
+            for mini_batch in mini_batches:
+                secondNetwork.backprop_with_mini_batch(mini_batch, eta)
+
+            random.shuffle(validation_PL_Label)
+            mini_valid_batch_size = 256
+            mini_valid_batches = [validation_PL_Label[k:k + mini_valid_batch_size] for k in
+                                  range(0, len(validation_data), mini_valid_batch_size)]
             for mini_vilid_batch in mini_valid_batches:
-                secondNetwork.backprop_with_mini_batch(mini_vilid_batch, eta, epoch=j, pseu=True)
+                secondNetwork.backprop_with_mini_batch(mini_vilid_batch, eta, epoch=j, pl=True)
 
             if test_data:
                 n_test = len(test_data)
@@ -273,4 +277,4 @@ if __name__ == "__main__":
 
     # DROP NN + PL + DAE
     DAE = Network([784, 5000, 784])
-    DAE.SGD_DAE(training_data, epochs=10, mini_batch_size=32, eta=3.0, validation_data=validation_data,test_data=test_data)
+    DAE.SGD_DAE(training_data, epochs=20, mini_batch_size=32, eta=3.0, validation_data=validation_data,test_data=test_data)
