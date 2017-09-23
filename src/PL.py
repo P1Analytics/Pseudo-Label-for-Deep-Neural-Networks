@@ -17,15 +17,14 @@ class Network(object):
     def backprop_with_mini_batch(self, mini_batch, eta=3, epoch=0, pl=False):
         nabla_b = [np.zeros(b.shape) for b in self.biases]
         nabla_w = [np.zeros(w.shape) for w in self.weights]
+
         for x, y in mini_batch:
             delta_nabla_b, delta_nabla_w = self.backprop(x, y, epoch, pl)
             nabla_b = [nb + dnb for nb, dnb in zip(nabla_b, delta_nabla_b)]
             nabla_w = [nw + dnw for nw, dnw in zip(nabla_w, delta_nabla_w)]
-        self.weights = [w - (eta / len(mini_batch)) * nw for w, nw in zip(self.weights, nabla_w)]
-        self.biases = [b - (eta / len(mini_batch)) * nb for b, nb in zip(self.biases, nabla_b)]
+        return nabla_w,nabla_b
 
     def backprop(self, x, y, epoch=0, pl=False):
-
         nabla_b = [np.zeros(b.shape) for b in self.biases]
         nabla_w = [np.zeros(w.shape) for w in self.weights]
 
@@ -64,7 +63,6 @@ class Network(object):
             # delta = np.dot(self.weights[-l + 1].transpose(), delta) * rectifier_prime(z)
             nabla_b[-l] = delta
             nabla_w[-l] = np.dot(delta, activations[-l - 1].transpose())
-
         return nabla_b, nabla_w
 
     def predict(self, a):
@@ -100,15 +98,17 @@ class Network(object):
             return 3
 
     def SGD_PL(self, training_data, epochs, mini_batch_size, eta, validation_data, test_data=None):
-
         validation_results = []
         for j in range(epochs):
+            print("training epoch / epochs",j,epochs)
             random.shuffle(training_data)
             mini_batches = [training_data[k:k + mini_batch_size] for k in range(0, len(training_data), mini_batch_size)]
             for mini_batch in mini_batches:
-                self.backprop_with_mini_batch(mini_batch, eta)
+                nabla_w,nabla_b = self.backprop_with_mini_batch(mini_batch, eta)
+                self.weights = [w - (eta / len(mini_batch)) * nw for w, nw in zip(self.weights, nabla_w)]
+                self.biases = [b - (eta / len(mini_batch)) * nb for b, nb in zip(self.biases, nabla_b)]
 
-        # pseudo label
+                # pseudo label
             labels = []
             for (x, y) in validation_data:
                 output = self.predict(x)
@@ -125,18 +125,25 @@ class Network(object):
         X = [x for x, y in validation_data]
         validation_PL_Label = list(zip(X, pseudo_labels))
 
+
         for j in range(epochs):
+            print("fine tuning epoch / epochs",j,epochs)
             random.shuffle(training_data)
-            mini_batches = [training_data[k:k + mini_batch_size] for k in range(0, len(training_data), mini_batch_size)]
-            for mini_batch in mini_batches:
-                self.backprop_with_mini_batch(mini_batch, eta)
+            mini_batches = [training_data[k:k + mini_batch_size] for k in
+                            range(0, len(training_data), mini_batch_size)]
 
             random.shuffle(validation_PL_Label)
             mini_valid_batch_size = 256
             mini_valid_batches = [validation_PL_Label[k:k + mini_valid_batch_size] for k in
                                   range(0, len(validation_data), mini_valid_batch_size)]
-            for mini_valid_batch in mini_valid_batches:
-                self.backprop_with_mini_batch(mini_valid_batch, eta, epoch=j, pl=True)
+
+            for i in range(0,len(mini_batches)):
+                nabla_w, nabla_b = self.backprop_with_mini_batch(mini_batches[i], eta)
+                if i < len(mini_valid_batches):
+                    nabla_w, nabla_b = self.backprop_with_mini_batch(mini_valid_batches[i], eta, epoch=j, pl=True)
+                self.weights = [w - (eta / len(mini_batch)) * nw for w, nw in zip(self.weights, nabla_w)]
+                self.biases = [b - (eta / len(mini_batch)) * nb for b, nb in zip(self.biases, nabla_b)]
+
 
             if test_data:
                 print("Epoch {0}: {1} / {2}".format(j, self.evaluate(test_data), len(test_data)))
