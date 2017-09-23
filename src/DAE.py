@@ -56,6 +56,7 @@ class Network(object):
         # delta = self.cost_derivative(activations[-1], y) * sigmoid_prime(zs[-1]) # QuadraticCost
         delta = self.cost_derivative(activations[-1], y)
 
+        # TODO something wrong here !
         if pl:
             # TODO when will be both pseudo label and DAE they are in different phase
             delta *= self.alfaCoefficient(epoch, DAE)
@@ -72,7 +73,7 @@ class Network(object):
 
         return nabla_b, nabla_w
 
-    def feedforward(self, a):
+    def predict(self, a):
         layer = 0
         for b, w in zip(self.biases, self.weights):
             z = np.dot(w, a) + b
@@ -86,7 +87,7 @@ class Network(object):
         return a
 
     def evaluate(self, test_data):
-        test_results = [(np.argmax(self.feedforward(x)), y) for (x, y) in test_data]
+        test_results = [(np.argmax(self.predict(x)), y) for (x, y) in test_data]
         return sum(int(x == y) for (x, y) in test_results)
 
     def cost_derivative(self, output_activations, y):
@@ -106,7 +107,7 @@ class Network(object):
 
     def SGD_DAE(self, training_data, epochs, mini_batch_size, eta, validation_data=None, test_data=None):
 
-        print("# DAE unsupervised learning")
+        print("# DAE unsupervised learning,init the network ")
         validation_results = []
         for j in range(epochs):
             random.shuffle(training_data)
@@ -114,8 +115,6 @@ class Network(object):
             for mini_batch in mini_batches:
                 self.backprop_with_mini_batch(mini_batch, eta, DAE=True)
 
-
-        print("# Fine tuning supervised learning")
         input_layer = self.sizes[0]
         hidden_layer = self.sizes[1]
         output_layer = 10
@@ -123,6 +122,7 @@ class Network(object):
         secondNetwork.weights[0] = self.weights[0]
         secondNetwork.biases[0] = self.biases[0]
 
+        print("# Fine tuning supervised learning")
         for j in range(epochs):
             random.shuffle(training_data)
             mini_batches = [training_data[k:k + mini_batch_size] for k in range(0, len(training_data), mini_batch_size)]
@@ -132,7 +132,7 @@ class Network(object):
             # pseudo label session
             labels = []
             for (x, y) in validation_data:
-                output = secondNetwork.feedforward(x)
+                output = secondNetwork.predict(x)
                 labels.append(np.argmax(output))
             validation_results.append(labels)
 
@@ -142,7 +142,7 @@ class Network(object):
             a = Counter(validation_array_results[:, i]).most_common(1)[0][0]
             label = vectorized_result(a)
             pseudo_labels.append(label)
-            validation_PL_Label = list(zip([x for x, y in validation_data], pseudo_labels))
+            data_pseudo_label = list(zip([x for x, y in validation_data], pseudo_labels))
 
         print("# train the network again with (training data+ real label) & (validate data + pseudo label)")
         for j in range(epochs):
@@ -151,9 +151,9 @@ class Network(object):
             for mini_batch in mini_batches:
                 secondNetwork.backprop_with_mini_batch(mini_batch, eta)
 
-            random.shuffle(validation_PL_Label)
+            random.shuffle(data_pseudo_label)
             mini_valid_batch_size = 256
-            mini_valid_batches = [validation_PL_Label[k:k + mini_valid_batch_size] for k in
+            mini_valid_batches = [data_pseudo_label[k:k + mini_valid_batch_size] for k in
                                   range(0, len(validation_data), mini_valid_batch_size)]
             for mini_vilid_batch in mini_valid_batches:
                 secondNetwork.backprop_with_mini_batch(mini_vilid_batch, eta, epoch=j, pl=True)

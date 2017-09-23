@@ -67,7 +67,7 @@ class Network(object):
 
         return nabla_b, nabla_w
 
-    def feedforward(self, a):
+    def predict(self, a):
         layer = 0
         for b, w in zip(self.biases, self.weights):
             z = np.dot(w, a) + b
@@ -81,7 +81,7 @@ class Network(object):
         return a
 
     def evaluate(self, test_data):
-        test_results = [(np.argmax(self.feedforward(x)), y) for (x, y) in test_data]
+        test_results = [(np.argmax(self.predict(x)), y) for (x, y) in test_data]
         return sum(int(x == y) for (x, y) in test_results)
 
     def cost_derivative(self, output_activations, y):
@@ -111,7 +111,7 @@ class Network(object):
         # pseudo label
             labels = []
             for (x, y) in validation_data:
-                output = self.feedforward(x)
+                output = self.predict(x)
                 labels.append(np.argmax(output))
             validation_results.append(labels)
 
