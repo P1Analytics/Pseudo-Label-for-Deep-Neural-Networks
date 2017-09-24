@@ -1,8 +1,8 @@
-
 import gzip
 import pickle
 import random
 import numpy as np
+
 np.seterr(all='ignore')
 
 
@@ -37,9 +37,9 @@ class Network(object):
             z = np.dot(w, activation) + b
             zs.append(z)
             if layer == 0:
-                activation = sigmoid(z)
+                # activation = sigmoid(z)
                 # TODO use differnet active functions return all WRONG label ! WHY ??
-                # activation = rectifier(z)
+                activation = rectifier(z)
             else:
                 activation = sigmoid(z)
             layer += 1
@@ -47,15 +47,15 @@ class Network(object):
 
         # backward phase
         # delta = self.cost_derivative(activations[-1], y) * sigmoid_prime(zs[-1]) # QuadraticCost
-        delta = self.cost_derivative(activations[-1], y) # cross entropy
+        delta = self.cost_derivative(activations[-1], y)  # cross entropy
         nabla_b[-1] = delta
         nabla_w[-1] = np.dot(delta, activations[-2].transpose())
 
         for l in range(2, self.num_layers):
             z = zs[-l]
-            delta = np.dot(self.weights[-l + 1].transpose(), delta) * sigmoid_prime(z)
+            # delta = np.dot(self.weights[-l + 1].transpose(), delta) * sigmoid_prime(z)
             # TODO different active function in the hidden layer, different prime(3)(BP2 in Ref)
-            # delta = np.dot(self.weights[-l + 1].transpose(), delta) * rectifier_prime(z)
+            delta = np.dot(self.weights[-l + 1].transpose(), delta) * rectifier_prime(z)
             nabla_b[-l] = delta
             nabla_w[-l] = np.dot(delta, activations[-l - 1].transpose())
         return nabla_b, nabla_w
@@ -65,9 +65,9 @@ class Network(object):
         for b, w in zip(self.biases, self.weights):
             z = np.dot(w, a) + b
             if layer == 0:
-                a = sigmoid(z)
+                # a = sigmoid(z)
                 # TODO different active function in the hidden layer
-                # a = rectifier(z) # for hidden layers
+                a = rectifier(z) # for hidden layers
             else:
                 a = sigmoid(z)  # for output layer
             layer += 1
@@ -75,7 +75,9 @@ class Network(object):
 
     def evaluate(self, test_data):
         test_results = [(np.argmax(self.predict(x)), y) for (x, y) in test_data]
-        return sum(int(x == y) for (x, y) in test_results)
+        acc = sum(int(x == y) for (x, y) in test_results)
+        error = 1 - acc / len(test_results)
+        return error*100
 
     def cost_derivative(self, output_activations, y):
         return output_activations - y
@@ -94,15 +96,15 @@ class Network(object):
 
     def SGD_NN(self, training_data, epochs, mini_batch_size, eta, test_data=None):
         for j in range(epochs):
-            print("Epoch {0} ".format(j))
             random.shuffle(training_data)
             mini_batches = [training_data[k:k + mini_batch_size] for k in range(0, len(training_data), mini_batch_size)]
 
             for mini_batch in mini_batches:
                 self.backprop_with_mini_batch(mini_batch, eta)
 
+            # print("Test data size is",len(test_data), "Error rate is:")
             if test_data:
-                print("Epoch {0}: {1} / {2}".format(j, self.evaluate(test_data), len(test_data)))
+                print(self.evaluate(test_data),"%")
             else:
                 print("Epoch {0} complete".format(j))
 
@@ -150,6 +152,7 @@ def load_data_wrapper():
     test_inputs = [np.reshape(x, (784, 1)) for x in te_d[0]]
     test_data = list(zip(test_inputs, te_d[1]))
     return (training_data, validation_data, test_data)
+
 
 def split_by_label(dataset, num_per_label):
     # pick out the same size label from data set
@@ -212,6 +215,7 @@ def split_by_label(dataset, num_per_label):
 
 if __name__ == "__main__":
     training_data, validation_data, test_data = load_data_wrapper();
+    training_data = split_by_label(training_data, num_per_label=10)
 
     NN = Network([784, 5000, 10])
-    NN.SGD_NN(training_data, epochs=5, mini_batch_size=32, eta=3.0, test_data=test_data)
+    NN.SGD_NN(training_data, epochs=10, mini_batch_size=32, eta=3.0, test_data=test_data)
