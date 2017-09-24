@@ -13,20 +13,29 @@ class Network(object):
         self.biases = [np.random.randn(y, 1) for y in sizes[1:]]
         self.weights = [np.random.randn(y, x) for x, y in zip(sizes[:-1], sizes[1:])]
 
-    def backprop_with_mini_batch(self, mini_batch, eta=3, epoch=0, pseu=False):
+    def backprop_with_mini_batch(self, mini_batch, delta_w, delta_b, eta=3, epoch=0):
         nabla_b = [np.zeros(b.shape) for b in self.biases]
         nabla_w = [np.zeros(w.shape) for w in self.weights]
         for x, y in mini_batch:
             delta_nabla_b, delta_nabla_w = self.backprop(x, y)
             nabla_b = [nb + dnb for nb, dnb in zip(nabla_b, delta_nabla_b)]
             nabla_w = [nw + dnw for nw, dnw in zip(nabla_w, delta_nabla_w)]
-        self.weights = [w - (eta / len(mini_batch)) * nw for w, nw in zip(self.weights, nabla_w)]
-        self.biases = [b - (eta / len(mini_batch)) * nb for b, nb in zip(self.biases, nabla_b)]
+
+
+        delta_w_new = [w_pri * p(epoch) - nw * (1 - p(epoch)) * learning_rate(eta, epoch) / len(mini_batch) for
+                        nw, w_pri in zip(nabla_w, delta_w)]
+        delta_b_new = [b_pri * p(epoch) - nb * (1 - p(epoch)) * learning_rate(eta, epoch) / len(mini_batch) for
+                        nb, b_pri in zip(nabla_b, delta_b)]
+
+        self.weights = [w + d_w for w, d_w in zip(self.weights, delta_w_new)]
+        self.biases = [b + d_b for b, d_b in zip(self.biases,delta_b_new)]
+
+        return delta_w_new, delta_b_new
 
     def backprop(self, x, y):
 
-        nabla_b = [np.zeros(b.shape) for b in self.biases]
-        nabla_w = [np.zeros(w.shape) for w in self.weights]
+        delta_nabla_b = [np.zeros(b.shape) for b in self.biases]
+        delta_nabla_w = [np.zeros(w.shape) for w in self.weights]
 
         # feedforward phase
         activation = x
@@ -38,7 +47,6 @@ class Network(object):
                 activation = np.multiply(activation, dropout(0.5, np.shape(activation)))
                 z = np.dot(w, activation) + b
                 zs.append(z)
-
                 activation = sigmoid(z)
                 # TODO use differnet active functions return all WRONG label ! WHY ??
                 # activation = rectifier(z)
@@ -53,17 +61,17 @@ class Network(object):
         # backward phase
         # delta = self.cost_derivative(activations[-1], y) * sigmoid_prime(zs[-1]) # QuadraticCost
         delta = self.cost_derivative(activations[-1], y)  # cross entropy
-        nabla_b[-1] = delta
-        nabla_w[-1] = np.dot(delta, activations[-2].transpose())
+        delta_nabla_b[-1] = delta
+        delta_nabla_w[-1] = np.dot(delta, activations[-2].transpose())
 
         for l in range(2, self.num_layers):
             z = zs[-l]
             delta = np.dot(self.weights[-l + 1].transpose(), delta) * sigmoid_prime(z)
             # TODO different active function in the hidden layer
             # delta = np.dot(self.weights[-l + 1].transpose(), delta) * rectifier_prime(z)
-            nabla_b[-l] = delta
-            nabla_w[-l] = np.dot(delta, activations[-l - 1].transpose())
-        return nabla_b, nabla_w
+            delta_nabla_b[-l] = delta
+            delta_nabla_w[-l] = np.dot(delta, activations[-l - 1].transpose())
+        return delta_nabla_b, delta_nabla_w
 
     def predict(self, a):
         layer = 0
@@ -103,11 +111,13 @@ class Network(object):
         for j in range(epochs):
             random.shuffle(training_data)
             mini_batches = [training_data[k:k + mini_batch_size] for k in range(0, len(training_data), mini_batch_size)]
+            delta_w = [np.zeros(w.shape) for w in self.weights]
+            delta_b = [np.zeros(b.shape) for b in self.biases]
             for mini_batch in mini_batches:
-                self.backprop_with_mini_batch(mini_batch, eta)
+                delta_w, delta_b = self.backprop_with_mini_batch(mini_batch, delta_w, delta_b, eta, j)
 
             if test_data:
-                print(self.evaluate(test_data),"%")
+                print(self.evaluate(test_data), "%")
 
 
 def sigmoid(z):
@@ -132,6 +142,20 @@ def rectifier_prime(z):  # f'(x)=(max(0,x))'  http://kawahara.ca/what-is-the-der
 
 def dropout(probability, shape):
     return np.random.binomial(1, probability, shape)
+
+
+def learning_rate(eta, epoch):
+    return 0.998 ** epoch * eta
+
+
+def p(t):
+    pf = 0.99
+    pi = 0.5
+    T = 500
+    if t < T:
+        return t / T * pf + (1 - t / T) * pi
+    else:
+        return pf
 
 
 def vectorized_result(j):
@@ -219,9 +243,9 @@ def split_by_label(dataset, num_per_label):
 
 
 if __name__ == "__main__":
-    training_data, validation_data, test_data = load_data_wrapper();
-    training_data = split_by_label(training_data, num_per_label=300)
+    training_data, validation_data, test_data = load_data_wrapper()
 
-    # DROP NN
+    training_data = split_by_label(training_data, num_per_label=10)
+
     DropNN = Network([784, 5000, 10])
     DropNN.SGD_DropNN(training_data, epochs=20, mini_batch_size=32, eta=3.0, test_data=test_data)
