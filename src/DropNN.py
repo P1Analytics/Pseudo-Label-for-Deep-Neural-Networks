@@ -2,6 +2,7 @@ import gzip
 import pickle
 import random
 import numpy as np
+import datetime
 
 np.seterr(all='ignore')
 
@@ -21,14 +22,13 @@ class Network(object):
             nabla_b = [nb + dnb for nb, dnb in zip(nabla_b, delta_nabla_b)]
             nabla_w = [nw + dnw for nw, dnw in zip(nabla_w, delta_nabla_w)]
 
-
         delta_w_new = [w_pri * p(epoch) - nw * (1 - p(epoch)) * learning_rate(eta, epoch) / len(mini_batch) for
-                        nw, w_pri in zip(nabla_w, delta_w)]
+                       nw, w_pri in zip(nabla_w, delta_w)]
         delta_b_new = [b_pri * p(epoch) - nb * (1 - p(epoch)) * learning_rate(eta, epoch) / len(mini_batch) for
-                        nb, b_pri in zip(nabla_b, delta_b)]
+                       nb, b_pri in zip(nabla_b, delta_b)]
 
         self.weights = [w + d_w for w, d_w in zip(self.weights, delta_w_new)]
-        self.biases = [b + d_b for b, d_b in zip(self.biases,delta_b_new)]
+        self.biases = [b + d_b for b, d_b in zip(self.biases, delta_b_new)]
 
         return delta_w_new, delta_b_new
 
@@ -39,19 +39,19 @@ class Network(object):
 
         # feedforward phase
         activation = x
-        activations = [x]
+        activation = np.multiply(activation, dropout(0.5, np.shape(activation)))
+        activations = [activation]
         zs = []
         layer = 0
         for b, w in zip(self.biases, self.weights):
             if layer == 0:
-                activation = np.multiply(activation, dropout(0.5, np.shape(activation)))
                 z = np.dot(w, activation) + b
                 zs.append(z)
-                activation = sigmoid(z)
                 # TODO use differnet active functions return all WRONG label ! WHY ??
                 # activation = rectifier(z)
-            else:
+                activation = sigmoid(z)
                 activation = np.multiply(activation, dropout(0.2, np.shape(activation)))
+            else:
                 z = np.dot(w, activation) + b
                 zs.append(z)
                 activation = sigmoid(z)
@@ -145,7 +145,7 @@ def dropout(probability, shape):
 
 
 def learning_rate(eta, epoch):
-    return 0.998 ** epoch * eta
+    return eta * (0.998 ** epoch)
 
 
 def p(t):
@@ -244,8 +244,30 @@ def split_by_label(dataset, num_per_label):
 
 if __name__ == "__main__":
     training_data, validation_data, test_data = load_data_wrapper()
+    print("test condition: drop out on output ")
 
-    training_data = split_by_label(training_data, num_per_label=10)
-
+    training_data_subset = split_by_label(training_data, num_per_label=10)
     DropNN = Network([784, 5000, 10])
-    DropNN.SGD_DropNN(training_data, epochs=20, mini_batch_size=32, eta=3.0, test_data=test_data)
+    print(datetime.datetime.time(datetime.datetime.now()))
+    DropNN.SGD_DropNN(training_data_subset, epochs=10, mini_batch_size=32, eta=3, test_data=test_data)
+    print(datetime.datetime.time(datetime.datetime.now()))
+
+    training_data_subset = split_by_label(training_data, num_per_label=60)
+    DropNN = Network([784, 5000, 10])
+    print(datetime.datetime.time(datetime.datetime.now()))
+    DropNN.SGD_DropNN(training_data_subset, epochs=10, mini_batch_size=32, eta=3, test_data=test_data)
+    print(datetime.datetime.time(datetime.datetime.now()))
+
+    training_data_subset = split_by_label(training_data, num_per_label=100)
+    DropNN = Network([784, 5000, 10])
+    print(datetime.datetime.time(datetime.datetime.now()))
+    DropNN.SGD_DropNN(training_data_subset, epochs=10, mini_batch_size=32, eta=3, test_data=test_data)
+    print(datetime.datetime.time(datetime.datetime.now()))
+
+    training_data_subset = split_by_label(training_data, num_per_label=300)
+    DropNN = Network([784, 5000, 10])
+    print(datetime.datetime.time(datetime.datetime.now()))
+    DropNN.SGD_DropNN(training_data_subset, epochs=10, mini_batch_size=32, eta=3, test_data=test_data)
+    print(datetime.datetime.time(datetime.datetime.now()))
+
+
