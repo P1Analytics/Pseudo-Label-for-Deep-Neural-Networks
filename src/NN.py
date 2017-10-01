@@ -13,7 +13,7 @@ class Network(object):
         self.biases = [np.random.randn(y, 1) for y in sizes[1:]]
         self.weights = [np.random.randn(y, x) for x, y in zip(sizes[:-1], sizes[1:])]
 
-    def backprop_with_mini_batch(self, mini_batch, eta=3, epoch=0, pseu=False):
+    def backprop_with_mini_batch(self, mini_batch, eta=1.5):
         nabla_b = [np.zeros(b.shape) for b in self.biases]
         nabla_w = [np.zeros(w.shape) for w in self.weights]
         for x, y in mini_batch:
@@ -25,8 +25,8 @@ class Network(object):
 
     def backprop(self, x, y):
 
-        nabla_b = [np.zeros(b.shape) for b in self.biases]
-        nabla_w = [np.zeros(w.shape) for w in self.weights]
+        delta_nabla_b = [np.zeros(b.shape) for b in self.biases]
+        delta_nabla_w = [np.zeros(w.shape) for w in self.weights]
 
         # feedforward phase
         activation = x
@@ -37,37 +37,36 @@ class Network(object):
             z = np.dot(w, activation) + b
             zs.append(z)
             if layer == 0:
-                # activation = sigmoid(z)
+                activation = sigmoid(z)
                 # TODO use differnet active functions return all WRONG label ! WHY ??
-                activation = rectifier(z)
+                # activation = rectifier(z)
             else:
                 activation = sigmoid(z)
             layer += 1
             activations.append(activation)
 
         # backward phase
-        # delta = self.cost_derivative(activations[-1], y) * sigmoid_prime(zs[-1]) # QuadraticCost
-        delta = self.cost_derivative(activations[-1], y)  # cross entropy
-        nabla_b[-1] = delta
-        nabla_w[-1] = np.dot(delta, activations[-2].transpose())
+        delta = self.cost_derivative(activations[-1], y)  # cross-entropy
+        delta_nabla_b[-1] = delta
+        delta_nabla_w[-1] = np.dot(delta, activations[-2].transpose())
 
         for l in range(2, self.num_layers):
             z = zs[-l]
-            # delta = np.dot(self.weights[-l + 1].transpose(), delta) * sigmoid_prime(z)
+            delta = np.dot(self.weights[-l + 1].transpose(), delta) * sigmoid_prime(z)
             # TODO different active function in the hidden layer, different prime(3)(BP2 in Ref)
-            delta = np.dot(self.weights[-l + 1].transpose(), delta) * rectifier_prime(z)
-            nabla_b[-l] = delta
-            nabla_w[-l] = np.dot(delta, activations[-l - 1].transpose())
-        return nabla_b, nabla_w
+            # delta = np.dot(self.weights[-l + 1].transpose(), delta) * rectifier_prime(z)
+            delta_nabla_b[-l] = delta
+            delta_nabla_w[-l] = np.dot(delta, activations[-l - 1].transpose())
+        return delta_nabla_b, delta_nabla_w
 
     def predict(self, a):
         layer = 0
         for b, w in zip(self.biases, self.weights):
             z = np.dot(w, a) + b
             if layer == 0:
-                # a = sigmoid(z)
+                a = sigmoid(z)
                 # TODO different active function in the hidden layer
-                a = rectifier(z) # for hidden layers
+                # a = rectifier(z) # for hidden layers
             else:
                 a = sigmoid(z)  # for output layer
             layer += 1
@@ -80,34 +79,17 @@ class Network(object):
         return error*100
 
     def cost_derivative(self, output_activations, y):
-        return output_activations - y
-
-    def alfaCoefficient(self, currentEpoch, DAE=False):
-        if DAE:
-            epochT1, epochT2 = 200, 800
-        else:
-            epochT1, epochT2 = 100, 600
-        if currentEpoch < epochT1:
-            return 0
-        elif epochT1 <= currentEpoch & currentEpoch < epochT2:
-            return ((currentEpoch - epochT1) * 0.4) / epochT2 - epochT1
-        elif epochT2 <= currentEpoch:
-            return 3
+        return (output_activations - y)/ np.log(10)
 
     def SGD_NN(self, training_data, epochs, mini_batch_size, eta, test_data=None):
         for j in range(epochs):
             random.shuffle(training_data)
             mini_batches = [training_data[k:k + mini_batch_size] for k in range(0, len(training_data), mini_batch_size)]
-
             for mini_batch in mini_batches:
                 self.backprop_with_mini_batch(mini_batch, eta)
 
-            # print("Test data size is",len(test_data), "Error rate is:")
             if test_data:
                 print(self.evaluate(test_data),"%")
-            else:
-                print("Epoch {0} complete".format(j))
-
 
 def sigmoid(z):
     return 1.0 / (1.0 + np.exp(-z))
@@ -156,7 +138,7 @@ def load_data_wrapper():
 
 def split_by_label(dataset, num_per_label):
     # pick out the same size label from data set
-    counter = np.zeros(10)  # for 10 classes
+    counter = np.zeros(10)  # for 10 classes [0,1,2....9]
     new_dataset = []
     for i in dataset:
         x, y = i
@@ -214,8 +196,14 @@ def split_by_label(dataset, num_per_label):
 
 
 if __name__ == "__main__":
-    training_data, validation_data, test_data = load_data_wrapper();
-    training_data = split_by_label(training_data, num_per_label=10)
+    training_data, validation_data, test_data = load_data_wrapper()
 
-    NN = Network([784, 5000, 10])
-    NN.SGD_NN(training_data, epochs=10, mini_batch_size=32, eta=3.0, test_data=test_data)
+    loop = 15
+    learning = 1.5
+    print("eta = ", learning, "epochs = ", loop)
+
+    for i in (10, 60, 100, 300):
+        training_data_small = split_by_label(training_data, num_per_label=i)
+        Neural = Network([784, 5000, 10])
+        Neural.SGD_NN(training_data_small, epochs=loop, mini_batch_size=32, eta=learning,test_data=test_data)
+        break
