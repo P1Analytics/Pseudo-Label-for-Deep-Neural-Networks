@@ -23,8 +23,8 @@ class Network(object):
         return nabla_w, nabla_b
 
     def backprop(self, x, y):
-        nabla_b = [np.zeros(b.shape) for b in self.biases]
-        nabla_w = [np.zeros(w.shape) for w in self.weights]
+        delta_nabla_b = [np.zeros(b.shape) for b in self.biases]
+        delta_nabla_w = [np.zeros(w.shape) for w in self.weights]
 
         # feedforward phase
         activation = x
@@ -33,9 +33,11 @@ class Network(object):
         layer = 0
         for b, w in zip(self.biases, self.weights):
             if layer == 0:
-                activation = np.multiply(activation, dropout(0.5, np.shape(activation)))
+                mask_1 = dropout(0.5, np.shape(activation))
+                activation = np.multiply(activation, mask_1)
             else:
-                activation = np.multiply(activation, dropout(0.2, np.shape(activation)))
+                mask_2 = dropout(0.2, np.shape(activation))
+                activation = np.multiply(activation, mask_2)
             layer += 1
             z = np.dot(w, activation) + b
             zs.append(z)
@@ -44,16 +46,16 @@ class Network(object):
 
         # backward phase
         delta = self.cost_derivative(activations[-1], y)
-        nabla_b[-1] = delta
-        nabla_w[-1] = np.dot(delta, activations[-2].transpose())
+        delta_nabla_b[-1] = delta
+        delta_nabla_w[-1] = np.dot(delta, np.multiply(activations[-2],mask_2).transpose())
 
         for l in range(2, self.num_layers):
             z = zs[-l]
             delta = np.dot(self.weights[-l + 1].transpose(), delta) * sigmoid_prime(z)
-            nabla_b[-l] = delta
-            nabla_w[-l] = np.dot(delta, activations[-l - 1].transpose())
+            delta_nabla_b[-l] = delta
+            delta_nabla_w[-l] = np.dot(delta,np.multiply(activations[-l - 1],mask_1).transpose())
 
-        return nabla_b, nabla_w
+        return delta_nabla_b, delta_nabla_w
 
     def predict(self, a):
         for b, w in zip(self.biases, self.weights):
@@ -278,7 +280,7 @@ def split_by_label(dataset, num_per_label):
 
 
 if __name__ == "__main__":
-    training_data, validation_data, test_data = load_data_wrapper();
+    training_data, validation_data, test_data = load_data_wrapper()
 
     loop = 15
     learning = 1.5
