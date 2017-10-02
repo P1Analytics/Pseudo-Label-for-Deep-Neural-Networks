@@ -2,7 +2,6 @@ import gzip
 import pickle
 import random
 import numpy as np
-import datetime
 
 np.seterr(all='ignore')
 
@@ -14,7 +13,7 @@ class Network(object):
         self.biases = [np.random.randn(y, 1) for y in sizes[1:]]
         self.weights = [np.random.randn(y, x) for x, y in zip(sizes[:-1], sizes[1:])]
 
-    def backprop_with_mini_batch(self, mini_batch, delta_w, delta_b, eta=3, epoch=0):
+    def backprop_with_mini_batch(self, mini_batch, delta_w, delta_b, eta=1.5, epoch=0):
         nabla_b = [np.zeros(b.shape) for b in self.biases]
         nabla_w = [np.zeros(w.shape) for w in self.weights]
         for x, y in mini_batch:
@@ -22,15 +21,15 @@ class Network(object):
             nabla_b = [nb + dnb for nb, dnb in zip(nabla_b, delta_nabla_b)]
             nabla_w = [nw + dnw for nw, dnw in zip(nabla_w, delta_nabla_w)]
 
-        delta_w_new = [w_pri * p(epoch) - nw * (1 - p(epoch)) * learning_rate(eta, epoch) / len(mini_batch) for
-                       nw, w_pri in zip(nabla_w, delta_w)]
-        delta_b_new = [b_pri * p(epoch) - nb * (1 - p(epoch)) * learning_rate(eta, epoch) / len(mini_batch) for
-                       nb, b_pri in zip(nabla_b, delta_b)]
+        delta_w = [w_pri * p(epoch) - nw * (1 - p(epoch)) * learning_rate(eta, epoch) / len(mini_batch) for
+                       w_pri, nw in zip(delta_w,nabla_w)]
+        delta_b = [b_pri * p(epoch) - nb * (1 - p(epoch)) * learning_rate(eta, epoch) / len(mini_batch) for
+                       b_pri, nb in zip(delta_b,nabla_b)]
 
-        self.weights = [w + d_w for w, d_w in zip(self.weights, delta_w_new)]
-        self.biases = [b + d_b for b, d_b in zip(self.biases, delta_b_new)]
+        self.weights = [w + d_w for w, d_w in zip(self.weights, delta_w)]
+        self.biases = [b + d_b for b, d_b in zip(self.biases, delta_b)]
 
-        return delta_w_new, delta_b_new
+        return delta_w, delta_b
 
     def backprop(self, x, y):
 
@@ -39,19 +38,22 @@ class Network(object):
 
         # feedforward phase
         activation = x
-        activation = np.multiply(activation, dropout(0.5, np.shape(activation)))
         activations = [activation]
         zs = []
         layer = 0
         for b, w in zip(self.biases, self.weights):
             if layer == 0:
+                mask_1 = dropout(0.5, np.shape(activation))
+                activation = np.multiply(activation, mask_1)
                 z = np.dot(w, activation) + b
                 zs.append(z)
+                activation = sigmoid(z)
+
                 # TODO use differnet active functions return all WRONG label ! WHY ??
                 # activation = rectifier(z)
-                activation = sigmoid(z)
-                activation = np.multiply(activation, dropout(0.2, np.shape(activation)))
             else:
+                mask_2 = dropout(0.2, np.shape(activation))
+                activation = np.multiply(activation, mask_2)
                 z = np.dot(w, activation) + b
                 zs.append(z)
                 activation = sigmoid(z)
@@ -62,7 +64,9 @@ class Network(object):
         # delta = self.cost_derivative(activations[-1], y) * sigmoid_prime(zs[-1]) # QuadraticCost
         delta = self.cost_derivative(activations[-1], y)  # cross entropy
         delta_nabla_b[-1] = delta
-        delta_nabla_w[-1] = np.dot(delta, activations[-2].transpose())
+        drop_1=np.multiply(activations[-2],mask_2)
+        delta_nabla_w[-1] = np.dot(delta, drop_1.transpose())
+
 
         for l in range(2, self.num_layers):
             z = zs[-l]
@@ -70,7 +74,9 @@ class Network(object):
             # TODO different active function in the hidden layer
             # delta = np.dot(self.weights[-l + 1].transpose(), delta) * rectifier_prime(z)
             delta_nabla_b[-l] = delta
-            delta_nabla_w[-l] = np.dot(delta, activations[-l - 1].transpose())
+            drop_2 = np.multiply(activations[-l - 1],mask_1)
+            delta_nabla_w[-l] = np.dot(delta,drop_2.transpose())
+
         return delta_nabla_b, delta_nabla_w
 
     def predict(self, a):
@@ -93,7 +99,7 @@ class Network(object):
         return error * 100
 
     def cost_derivative(self, output_activations, y):
-        return output_activations - y
+        return (output_activations - y)/np.log(10)
 
     def alfaCoefficient(self, currentEpoch, DAE=False):
         if DAE:
@@ -244,30 +250,12 @@ def split_by_label(dataset, num_per_label):
 
 if __name__ == "__main__":
     training_data, validation_data, test_data = load_data_wrapper()
-    print("test condition: drop out on output ")
 
-    training_data_subset = split_by_label(training_data, num_per_label=10)
-    DropNN = Network([784, 5000, 10])
-    print(datetime.datetime.time(datetime.datetime.now()))
-    DropNN.SGD_DropNN(training_data_subset, epochs=10, mini_batch_size=32, eta=3, test_data=test_data)
-    print(datetime.datetime.time(datetime.datetime.now()))
+    loop = 15
+    learning = 1.5
+    print("eta = ", learning, "epochs = ", loop)
 
-    training_data_subset = split_by_label(training_data, num_per_label=60)
-    DropNN = Network([784, 5000, 10])
-    print(datetime.datetime.time(datetime.datetime.now()))
-    DropNN.SGD_DropNN(training_data_subset, epochs=10, mini_batch_size=32, eta=3, test_data=test_data)
-    print(datetime.datetime.time(datetime.datetime.now()))
-
-    training_data_subset = split_by_label(training_data, num_per_label=100)
-    DropNN = Network([784, 5000, 10])
-    print(datetime.datetime.time(datetime.datetime.now()))
-    DropNN.SGD_DropNN(training_data_subset, epochs=10, mini_batch_size=32, eta=3, test_data=test_data)
-    print(datetime.datetime.time(datetime.datetime.now()))
-
-    training_data_subset = split_by_label(training_data, num_per_label=300)
-    DropNN = Network([784, 5000, 10])
-    print(datetime.datetime.time(datetime.datetime.now()))
-    DropNN.SGD_DropNN(training_data_subset, epochs=10, mini_batch_size=32, eta=3, test_data=test_data)
-    print(datetime.datetime.time(datetime.datetime.now()))
-
-
+    for i in (100,300):
+        training_data_small = split_by_label(training_data, num_per_label=i)
+        Neural = Network([784, 5000, 10])
+        Neural.SGD_DropNN(training_data_small, epochs=loop, mini_batch_size=32, eta=learning,test_data=test_data)
