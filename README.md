@@ -8,3 +8,5 @@
 [Theano Tutorial](http://deeplearning.net/software/theano/tutorial/)
 
 [Deep Learning Tutorials](http://deeplearning.net/tutorial/)
+
+[TensorFlow](https://www.tensorflow.org/get_started/mnist/beginners)
